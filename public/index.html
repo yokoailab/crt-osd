@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Control de Personal en CRT/OSD</title>
+  <style>
+    :root {
+      --primary:    #0d47a1;
+      --primary-lt: #1565c0;
+      --accent:     #00b0ff;
+      --success:    #00c853;
+      --warning:    #ffab00;
+      --danger:     #dd2c00;
+      --bg:         #080c16;
+      --card:       #0f1623;
+      --card2:      #161f30;
+      --border:     #1b2840;
+      --text:       #e8eaf6;
+      --muted:      #607498;
+      --radius:     14px;
+      --shadow:     0 8px 32px rgba(0,0,0,.6);
+    }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-direction:column}
+
+    /* HEADER */
+    header{background:linear-gradient(135deg,#08112b 0%,#0b2248 60%,#0a3470 100%);border-bottom:1px solid var(--border);padding:0 20px;position:sticky;top:0;z-index:200;box-shadow:0 2px 24px rgba(0,0,0,.7)}
+    .header-inner{max-width:1100px;margin:0 auto;display:flex;align-items:center;gap:14px;padding:13px 0}
+    .header-icon{width:46px;height:46px;background:linear-gradient(135deg,var(--accent),var(--primary));border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;box-shadow:0 0 18px rgba(0,176,255,.4);flex-shrink:0}
+    .header-text h1{font-size:clamp(.95rem,2.8vw,1.2rem);font-weight:700;letter-spacing:.4px;color:#fff}
+    .header-text p{font-size:.7rem;color:var(--muted);letter-spacing:1.4px;text-transform:uppercase;margin-top:2px}
+    .header-right{margin-left:auto;display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end}
+    .badge{background:rgba(0,176,255,.1);border:1px solid rgba(0,176,255,.25);color:var(--accent);font-size:.68rem;font-weight:700;padding:4px 10px;border-radius:20px;letter-spacing:1px;text-transform:uppercase;white-space:nowrap}
+
+    /* TABS */
+    .tabs{display:flex;background:var(--card);border-bottom:1px solid var(--border);padding:0 20px;position:sticky;top:72px;z-index:100}
+    .tabs-inner{max-width:1100px;margin:0 auto;display:flex;gap:4px;width:100%}
+    .tab{padding:12px 20px;font-size:.82rem;font-weight:600;cursor:pointer;border:none;background:none;color:var(--muted);border-bottom:3px solid transparent;transition:all .2s;letter-spacing:.3px;white-space:nowrap}
+    .tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+    .tab:hover:not(.active){color:var(--text)}
+
+    main{flex:1;padding:28px 16px 60px;display:flex;flex-direction:column;align-items:center;gap:22px;max-width:1100px;margin:0 auto;width:100%}
+
+    .panel{display:none;width:100%;flex-direction:column;align-items:center;gap:22px}
+    .panel.active{display:flex}
+
+    .card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:24px;width:100%;max-width:760px;box-shadow:var(--shadow)}
+    .card.wide{max-width:1060px}
+    .card-title{font-size:.68rem;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--accent);margin-bottom:16px;display:flex;align-items:center;gap:8px}
+    .card-title::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,var(--border),transparent)}
+
+    /* SELECT */
+    .select-wrapper{position:relative}
+    .select-wrapper::after{content:'▾';position:absolute;right:16px;top:50%;transform:translateY(-50%);color:var(--accent);pointer-events:none}
+    select{width:100%;appearance:none;background:var(--card2);border:1.5px solid var(--border);color:var(--text);font-size:1rem;padding:14px 44px 14px 18px;border-radius:10px;cursor:pointer;transition:border-color .2s,box-shadow .2s;outline:none}
+    select:focus,select:hover{border-color:var(--accent);box-shadow:0 0 0 3px rgba(0,176,255,.12)}
+    select option{background:#0f1623}
+
+    /* DEPT BANNER */
+    .dept-banner{display:flex;align-items:center;justify-content:space-between;background:linear-gradient(135deg,rgba(0,176,255,.07),rgba(21,101,192,.07));border:1px solid rgba(0,176,255,.2);border-radius:12px;padding:14px 20px;margin-bottom:20px;flex-wrap:wrap;gap:10px}
+    .dept-banner-name{font-size:1.1rem;font-weight:700;color:#fff}
+    .dept-banner-hint{font-size:.73rem;color:var(--muted)}
+    .save-state{font-size:.7rem;padding:3px 10px;border-radius:20px;font-weight:600;transition:all .3s}
+    .save-state.saved  {color:var(--success);background:rgba(0,200,83,.1); border:1px solid rgba(0,200,83,.25)}
+    .save-state.saving {color:var(--warning);background:rgba(255,171,0,.1);border:1px solid rgba(255,171,0,.25)}
+    .save-state.error  {color:var(--danger); background:rgba(221,44,0,.1); border:1px solid rgba(221,44,0,.25)}
+
+    /* SLIDERS */
+    .slider-block{display:flex;flex-direction:column;gap:20px}
+    .slider-item{background:var(--card2);border:1px solid var(--border);border-radius:12px;padding:20px 22px;position:relative;overflow:hidden}
+    .slider-item::before{content:'';position:absolute;top:0;left:0;width:4px;height:100%;border-radius:4px 0 0 4px}
+    .slider-item.tx::before{background:linear-gradient(180deg,var(--accent),#1565c0)}
+    .slider-item.rx::before{background:linear-gradient(180deg,var(--success),#00838f)}
+    .slider-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:10px;flex-wrap:wrap}
+    .slider-label{display:flex;align-items:center;gap:10px}
+    .slider-icon{width:34px;height:34px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0}
+    .tx .slider-icon{background:rgba(0,176,255,.12)}
+    .rx .slider-icon{background:rgba(0,200,83,.12)}
+    .slider-name{font-size:.92rem;font-weight:600;color:#fff}
+    .slider-sub{font-size:.7rem;color:var(--muted);margin-top:1px}
+    .pct-bubble{font-size:1.45rem;font-weight:800;letter-spacing:-1px;min-width:60px;text-align:right}
+    .tx .pct-bubble{color:var(--accent)}
+    .rx .pct-bubble{color:var(--success)}
+    .slider-track{position:relative;height:8px;background:rgba(255,255,255,.06);border-radius:99px;margin:2px 0 8px}
+    .slider-fill{position:absolute;left:0;top:0;bottom:0;border-radius:99px;pointer-events:none;transition:width .08s}
+    .tx .slider-fill{background:linear-gradient(90deg,#1565c0,var(--accent));box-shadow:0 0 8px rgba(0,176,255,.45)}
+    .rx .slider-fill{background:linear-gradient(90deg,#00838f,var(--success));box-shadow:0 0 8px rgba(0,200,83,.35)}
+    input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:8px;background:transparent;outline:none;cursor:pointer;position:relative;z-index:2;margin:0}
+    input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;border-radius:50%;border:3px solid var(--bg);box-shadow:0 0 0 2px currentColor,0 4px 10px rgba(0,0,0,.5);margin-top:-7px;transition:transform .15s}
+    .tx input[type=range]::-webkit-slider-thumb{background:var(--accent);color:var(--accent)}
+    .rx input[type=range]::-webkit-slider-thumb{background:var(--success);color:var(--success)}
+    input[type=range]::-moz-range-thumb{width:22px;height:22px;border-radius:50%;border:3px solid var(--bg);box-shadow:0 0 0 2px currentColor,0 4px 10px rgba(0,0,0,.5)}
+    .tx input[type=range]::-moz-range-thumb{background:var(--accent);color:var(--accent)}
+    .rx input[type=range]::-moz-range-thumb{background:var(--success);color:var(--success)}
+    input[type=range]:hover::-webkit-slider-thumb{transform:scale(1.18)}
+    .slider-ticks{display:flex;justify-content:space-between;padding:0 2px}
+    .slider-ticks span{font-size:.63rem;color:var(--muted)}
+    .status-pill{display:inline-flex;align-items:center;gap:4px;font-size:.68rem;font-weight:700;padding:2px 9px;border-radius:20px;letter-spacing:.3px}
+    .status-pill.low {background:rgba(221,44,0,.12);color:var(--danger);border:1px solid rgba(221,44,0,.25)}
+    .status-pill.mid {background:rgba(255,171,0,.12);color:var(--warning);border:1px solid rgba(255,171,0,.25)}
+    .status-pill.high{background:rgba(0,200,83,.12);color:var(--success);border:1px solid rgba(0,200,83,.25)}
+
+    /* GLOBAL STATS */
+    .stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:14px;width:100%;max-width:1060px}
+    .stat-box{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:18px;text-align:center;box-shadow:var(--shadow)}
+    .stat-box .sv{font-size:1.8rem;font-weight:800;letter-spacing:-1px;line-height:1}
+    .stat-box .sl{font-size:.65rem;color:var(--muted);margin-top:4px;text-transform:uppercase;letter-spacing:1.2px}
+    .mini-bar{height:4px;background:rgba(255,255,255,.06);border-radius:99px;margin-top:8px;overflow:hidden}
+    .mini-fill{height:100%;border-radius:99px;transition:width .4s}
+    .c-tx .sv{color:var(--accent)}   .c-tx .mini-fill{background:var(--accent)}
+    .c-rx .sv{color:var(--success)}  .c-rx .mini-fill{background:var(--success)}
+    .c-avg .sv{color:var(--warning)} .c-avg .mini-fill{background:var(--warning)}
+    .c-cnt .sv{color:#b39ddb}
+
+    /* DEPT GRID */
+    .dept-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;width:100%}
+    .dept-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px 18px;box-shadow:var(--shadow);cursor:pointer;transition:border-color .2s,transform .15s,box-shadow .2s}
+    .dept-card:hover{border-color:rgba(0,176,255,.4);transform:translateY(-2px);box-shadow:0 12px 36px rgba(0,0,0,.5)}
+    .dept-card.has-data{border-left:3px solid rgba(0,176,255,.4)}
+    .dept-card.complete{border-left:3px solid var(--success)}
+    .dept-card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+    .dept-card-name{font-size:.88rem;font-weight:700;color:#fff}
+    .dept-card-avg{font-size:.82rem;font-weight:800;padding:2px 10px;border-radius:20px}
+    .dept-card-avg.low {background:rgba(221,44,0,.12);color:var(--danger)}
+    .dept-card-avg.mid {background:rgba(255,171,0,.12);color:var(--warning)}
+    .dept-card-avg.high{background:rgba(0,200,83,.12);color:var(--success)}
+    .dept-card-avg.none{background:rgba(255,255,255,.05);color:var(--muted)}
+    .dual-bar{display:flex;flex-direction:column;gap:6px}
+    .dual-bar-row{display:flex;align-items:center;gap:8px}
+    .dual-bar-label{font-size:.65rem;color:var(--muted);width:18px;flex-shrink:0}
+    .dual-bar-track{flex:1;height:6px;background:rgba(255,255,255,.06);border-radius:99px;overflow:hidden}
+    .dual-bar-fill{height:100%;border-radius:99px;transition:width .4s}
+    .fill-tx{background:linear-gradient(90deg,#1565c0,var(--accent))}
+    .fill-rx{background:linear-gradient(90deg,#00838f,var(--success))}
+    .dual-bar-pct{font-size:.7rem;font-weight:700;width:32px;text-align:right;flex-shrink:0}
+    .pct-tx{color:var(--accent)}
+    .pct-rx{color:var(--success)}
+    .edit-hint{font-size:.65rem;color:var(--muted);opacity:0;transition:opacity .2s;margin-top:8px;display:block;text-align:right}
+    .dept-card:hover .edit-hint{opacity:1}
+
+    /* TABLE */
+    .tbl-wrap{overflow-x:auto;width:100%}
+    table{width:100%;border-collapse:collapse;font-size:.82rem;min-width:520px}
+    thead tr{border-bottom:1px solid var(--border)}
+    th{text-align:left;padding:8px 10px;font-size:.62rem;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);white-space:nowrap;cursor:pointer}
+    th:hover{color:var(--accent)}
+    td{padding:10px 10px;border-bottom:1px solid rgba(255,255,255,.04)}
+    tr:last-child td{border-bottom:none}
+    tr:hover td{background:rgba(255,255,255,.02)}
+    .td-name{font-weight:600;color:#fff;cursor:pointer}
+    .td-tx{color:var(--accent);font-weight:700}
+    .td-rx{color:var(--success);font-weight:700}
+    .inline-bar{height:5px;background:rgba(255,255,255,.06);border-radius:99px;overflow:hidden;width:100px}
+    .inline-fill{height:100%;border-radius:99px;background:linear-gradient(90deg,var(--primary-lt),var(--accent))}
+
+    /* SEARCH */
+    .search-row{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap}
+    .search-input{flex:1;min-width:160px;background:var(--card2);border:1.5px solid var(--border);color:var(--text);font-size:.85rem;padding:9px 14px;border-radius:8px;outline:none;transition:border-color .2s}
+    .search-input:focus{border-color:var(--accent)}
+    .search-input::placeholder{color:var(--muted)}
+    .filter-sel{background:var(--card2);border:1.5px solid var(--border);color:var(--text);font-size:.82rem;padding:9px 14px;border-radius:8px;outline:none;cursor:pointer}
+
+    /* BUTTONS */
+    .btn-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+    button{padding:11px 18px;border:none;border-radius:10px;font-size:.85rem;font-weight:700;cursor:pointer;transition:all .2s}
+    .btn-primary{background:linear-gradient(135deg,var(--primary-lt),var(--accent));color:#fff;box-shadow:0 4px 16px rgba(0,176,255,.28)}
+    .btn-primary:hover{transform:translateY(-2px);box-shadow:0 8px 22px rgba(0,176,255,.42)}
+    .btn-danger{background:rgba(221,44,0,.1);color:var(--danger);border:1px solid rgba(221,44,0,.25)}
+    .btn-danger:hover{background:rgba(221,44,0,.2)}
+    button:disabled{opacity:.4;cursor:not-allowed;transform:none!important}
+
+    /* JSON VIEWER */
+    .json-viewer{background:#0a0f1c;border:1px solid var(--border);border-radius:10px;padding:16px;font-family:'Courier New',monospace;font-size:.78rem;color:#a5d6a7;max-height:320px;overflow-y:auto;white-space:pre;line-height:1.6}
+
+    /* TOAST */
+    .toast{position:fixed;bottom:22px;right:22px;background:#111827;border:1px solid rgba(0,176,255,.3);color:#fff;padding:12px 18px;border-radius:10px;font-size:.82rem;box-shadow:0 8px 32px rgba(0,0,0,.5);display:flex;align-items:center;gap:8px;transform:translateY(70px);opacity:0;transition:all .32s cubic-bezier(.34,1.56,.64,1);z-index:999;max-width:320px}
+    .toast.show{transform:translateY(0);opacity:1}
+
+    /* LOADING OVERLAY */
+    .loading-overlay{position:fixed;inset:0;background:rgba(8,12,22,.7);display:flex;align-items:center;justify-content:center;z-index:500;backdrop-filter:blur(4px);opacity:0;pointer-events:none;transition:opacity .2s}
+    .loading-overlay.show{opacity:1;pointer-events:all}
+    .spinner{width:40px;height:40px;border:3px solid rgba(0,176,255,.2);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
+    @keyframes spin{to{transform:rotate(360deg)}}
+
+    @media(max-width:560px){
+      .card,.card.wide{padding:16px 12px}
+      .slider-item{padding:14px 12px}
+      .pct-bubble{font-size:1.2rem}
+      .tab{padding:10px 12px;font-size:.75rem}
+      .stat-box .sv{font-size:1.5rem}
+    }
+  </style>
+</head>
+<body>
+
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="spinner"></div>
+</div>
+
+<header>
+  <div class="header-inner">
+    <div class="header-icon">📡</div>
+    <div class="header-text">
+      <h1>Control de Personal en CRT/OSD</h1>
+      <p>Sistema de Monitoreo de Avance · Colombia</p>
+    </div>
+    <div class="header-right">
+      <div class="badge" id="clockBadge">--:--:--</div>
+      <div class="badge" id="countBadge" style="background:rgba(179,157,219,.1);border-color:rgba(179,157,219,.3);color:#b39ddb">0/20</div>
+      <div class="badge" id="dbBadge" style="background:rgba(0,200,83,.08);border-color:rgba(0,200,83,.25);color:var(--success)">📁 db.json</div>
+    </div>
+  </div>
+</header>
+
+<div class="tabs">
+  <div class="tabs-inner">
+    <button class="tab active" onclick="showTab('editor',this)">✏️ Editar</button>
+    <button class="tab" onclick="showTab('dashboard',this)">📊 Dashboard</button>
+    <button class="tab" onclick="showTab('tabla',this)">📋 Tabla</button>
+    <button class="tab" onclick="showTab('json',this)">🗄️ JSON</button>
+  </div>
+</div>
+
+<main>
+
+  <!-- ══ EDITOR ══ -->
+  <div class="panel active" id="panel-editor">
+    <div class="card">
+      <div class="card-title">🗺️ Seleccionar Departamento</div>
+      <div class="select-wrapper">
+        <select id="deptSelect" onchange="loadDept()">
+          <option value="">— Seleccione un departamento —</option>
+          <option>AMAZONAS</option><option>ARAUCA</option><option>BOGOTÁ</option>
+          <option>BOYACÁ</option><option>CALDAS</option><option>CAQUETÁ</option>
+          <option>CAUCA</option><option>CHOCÓ</option><option>CUNDINAMARCA</option>
+          <option>GUAINÍA</option><option>GUAVIARE</option><option>META</option>
+          <option>PUTUMAYO</option><option>QUINDÍO</option><option>RISARALDA</option>
+          <option>SAN ANDRÉS</option><option>TOLIMA</option><option>VALLE</option>
+          <option>VAUPÉS</option><option>VICHADA</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="card" id="editorCard" style="display:none">
+      <div class="dept-banner">
+        <div>
+          <div class="dept-banner-name" id="bannerName">—</div>
+          <div class="dept-banner-hint">Los cambios se guardan automáticamente en db.json</div>
+        </div>
+        <div class="save-state saved" id="saveState">✔ Guardado</div>
+      </div>
+
+      <div class="card-title">📊 Avance de Personal</div>
+      <div class="slider-block">
+        <div class="slider-item tx">
+          <div class="slider-header">
+            <div class="slider-label">
+              <div class="slider-icon">📤</div>
+              <div>
+                <div class="slider-name">Personal Transmisión</div>
+                <div class="slider-sub">CRT — Operadores en campo</div>
+              </div>
+            </div>
+            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+              <div class="pct-bubble" id="txVal">0%</div>
+              <div class="status-pill low" id="txStatus">⬤ Sin avance</div>
+            </div>
+          </div>
+          <div class="slider-track">
+            <div class="slider-fill" id="txFill" style="width:0%"></div>
+            <input type="range" id="txSlider" min="0" max="100" value="0" step="1" oninput="onSlide()">
+          </div>
+          <div class="slider-ticks"><span>0%</span><span>25%</span><span>50%</span><span>75%</span><span>100%</span></div>
+        </div>
+
+        <div class="slider-item rx">
+          <div class="slider-header">
+            <div class="slider-label">
+              <div class="slider-icon">📥</div>
+              <div>
+                <div class="slider-name">Personal Recepción</div>
+                <div class="slider-sub">OSD — Operadores recepción</div>
+              </div>
+            </div>
+            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+              <div class="pct-bubble" id="rxVal">0%</div>
+              <div class="status-pill low" id="rxStatus">⬤ Sin avance</div>
+            </div>
+          </div>
+          <div class="slider-track">
+            <div class="slider-fill" id="rxFill" style="width:0%"></div>
+            <input type="range" id="rxSlider" min="0" max="100" value="0" step="1" oninput="onSlide()">
+          </div>
+          <div class="slider-ticks"><span>0%</span><span>25%</span><span>50%</span><span>75%</span><span>100%</span></div>
+        </div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn-danger" onclick="clearDept()">🗑 Limpiar departamento</button>
+      </div>
+    </div>
+
+    <div id="noSelection" style="color:var(--muted);font-size:.88rem;text-align:center;padding:20px">
+      Selecciona un departamento para editar sus avances.
+    </div>
+  </div>
+
+  <!-- ══ DASHBOARD ══ -->
+  <div class="panel" id="panel-dashboard">
+    <div class="stats-row">
+      <div class="stat-box c-tx">
+        <div class="sv" id="gTx">0%</div>
+        <div class="sl">Promedio TX</div>
+        <div class="mini-bar"><div class="mini-fill" id="gTxBar" style="width:0%"></div></div>
+      </div>
+      <div class="stat-box c-rx">
+        <div class="sv" id="gRx">0%</div>
+        <div class="sl">Promedio RX</div>
+        <div class="mini-bar"><div class="mini-fill" id="gRxBar" style="width:0%"></div></div>
+      </div>
+      <div class="stat-box c-avg">
+        <div class="sv" id="gAvg">0%</div>
+        <div class="sl">Promedio General</div>
+        <div class="mini-bar"><div class="mini-fill" id="gAvgBar" style="width:0%"></div></div>
+      </div>
+      <div class="stat-box c-cnt">
+        <div class="sv" id="gCnt">0/20</div>
+        <div class="sl">Departamentos</div>
+        <div class="mini-bar" style="background:rgba(179,157,219,.1)">
+          <div class="mini-fill" id="gCntBar" style="width:0%;background:#b39ddb"></div>
+        </div>
+      </div>
+    </div>
+    <div class="card wide">
+      <div class="card-title">🗂️ Estado por Departamento <span style="font-size:.65rem;color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0">(clic para editar)</span></div>
+      <div class="dept-grid" id="deptGrid"></div>
+    </div>
+  </div>
+
+  <!-- ══ TABLA ══ -->
+  <div class="panel" id="panel-tabla">
+    <div class="card wide">
+      <div class="card-title">📋 Todos los Departamentos</div>
+      <div class="search-row">
+        <input class="search-input" id="searchInput" placeholder="🔍 Buscar…" oninput="renderTable()">
+        <select class="filter-sel" id="filterSel" onchange="renderTable()">
+          <option value="all">Todos</option>
+          <option value="withdata">Con datos</option>
+          <option value="nodata">Sin datos</option>
+          <option value="complete">100% completados</option>
+        </select>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th onclick="sortBy('name')">Departamento ⇅</th>
+              <th onclick="sortBy('tx')">TX % ⇅</th>
+              <th onclick="sortBy('rx')">RX % ⇅</th>
+              <th onclick="sortBy('avg')">Promedio ⇅</th>
+              <th>Barra</th>
+              <th>Estado</th>
+              <th>Actualizado</th>
+            </tr>
+          </thead>
+          <tbody id="tableBody"></tbody>
+        </table>
+      </div>
+      <div class="btn-row">
+        <button class="btn-danger" onclick="confirmReset()">🗑 Reiniciar toda la base de datos</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ JSON VIEWER ══ -->
+  <div class="panel" id="panel-json">
+    <div class="card wide">
+      <div class="card-title">🗄️ Contenido de db.json</div>
+      <div class="json-viewer" id="jsonViewer">Cargando…</div>
+      <div class="btn-row">
+        <button class="btn-primary" onclick="refreshJson()">🔄 Actualizar</button>
+        <button class="btn-primary" onclick="downloadJson()" style="background:linear-gradient(135deg,#1b5e20,#00c853)">⬇️ Descargar db.json</button>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<div class="toast" id="toast"><span id="toastMsg"></span></div>
+
+<script>
+/* ════════════════════════════════════════════════
+   CONSTANTES
+════════════════════════════════════════════════ */
+const DEPTS = [
+  'AMAZONAS','ARAUCA','BOGOTÁ','BOYACÁ','CALDAS','CAQUETÁ','CAUCA','CHOCÓ',
+  'CUNDINAMARCA','GUAINÍA','GUAVIARE','META','PUTUMAYO','QUINDÍO','RISARALDA',
+  'SAN ANDRÉS','TOLIMA','VALLE','VAUPÉS','VICHADA'
+];
+
+/* ════════════════════════════════════════════════
+   ESTADO LOCAL (caché de db.json)
+════════════════════════════════════════════════ */
+let dbCache = {};
+
+/* ════════════════════════════════════════════════
+   API HELPERS
+════════════════════════════════════════════════ */
+async function apiGet() {
+  const r = await fetch('/api/data');
+  if (!r.ok) throw new Error('Error al leer la base de datos');
+  return r.json();
+}
+
+async function apiPost(dept, tx, rx) {
+  const r = await fetch('/api/data', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ dept, tx, rx })
+  });
+  if (!r.ok) throw new Error('Error al guardar');
+  return r.json();
+}
+
+async function apiDelete(dept) {
+  const url = dept ? `/api/data/${encodeURIComponent(dept)}` : '/api/data';
+  const r   = await fetch(url, { method: 'DELETE' });
+  if (!r.ok) throw new Error('Error al eliminar');
+  return r.json();
+}
+
+/* ════════════════════════════════════════════════
+   LOADING
+════════════════════════════════════════════════ */
+function showLoading(v) {
+  document.getElementById('loadingOverlay').classList.toggle('show', v);
+}
+
+/* ════════════════════════════════════════════════
+   INICIALIZACIÓN
+════════════════════════════════════════════════ */
+async function init() {
+  showLoading(true);
+  try {
+    dbCache = await apiGet();
+    updateCountBadge();
+    renderDashboard();
+    renderTable();
+  } catch(e) {
+    showToast('❌ No se pudo conectar con el servidor');
+  } finally {
+    showLoading(false);
+  }
+}
+
+/* ════════════════════════════════════════════════
+   RELOJ
+════════════════════════════════════════════════ */
+function clock() {
+  document.getElementById('clockBadge').textContent =
+    new Date().toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+}
+clock(); setInterval(clock, 1000);
+
+/* ════════════════════════════════════════════════
+   TABS
+════════════════════════════════════════════════ */
+function showTab(t, btn) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+  document.getElementById('panel-' + t).classList.add('active');
+  btn.classList.add('active');
+  if (t === 'dashboard') renderDashboard();
+  if (t === 'tabla')     renderTable();
+  if (t === 'json')      refreshJson();
+}
+
+/* ════════════════════════════════════════════════
+   UTILIDADES
+════════════════════════════════════════════════ */
+function getStatus(v) {
+  if (!v || v === 0) return ['low',  '⬤ Sin avance'];
+  if (v < 50)        return ['low',  '⬤ En proceso'];
+  if (v < 80)        return ['mid',  '◑ Avance medio'];
+  if (v < 100)       return ['high', '● Avance alto'];
+  return                   ['high', '✔ Completado'];
+}
+
+function updateCountBadge() {
+  document.getElementById('countBadge').textContent =
+    `${Object.keys(dbCache).length}/20`;
+}
+
+/* ════════════════════════════════════════════════
+   EDITOR
+════════════════════════════════════════════════ */
+let currentDept  = '';
+let saveTimer    = null;
+
+function loadDept() {
+  const d = document.getElementById('deptSelect').value;
+  currentDept = d;
+  const card = document.getElementById('editorCard');
+  const hint = document.getElementById('noSelection');
+  if (!d) { card.style.display = 'none'; hint.style.display = 'block'; return; }
+  card.style.display = 'block';
+  hint.style.display = 'none';
+  document.getElementById('bannerName').textContent = d;
+  const rec = dbCache[d] || { tx: 0, rx: 0 };
+  document.getElementById('txSlider').value = rec.tx || 0;
+  document.getElementById('rxSlider').value = rec.rx || 0;
+  updateSliderUI();
+  setSaveState('saved');
+}
+
+function onSlide() {
+  updateSliderUI();
+  setSaveState('saving');
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(autoSave, 700);
+}
+
+async function autoSave() {
+  const d  = currentDept; if (!d) return;
+  const tx = parseInt(document.getElementById('txSlider').value);
+  const rx = parseInt(document.getElementById('rxSlider').value);
+  try {
+    const res = await apiPost(d, tx, rx);
+    dbCache[d] = res.data;
+    updateCountBadge();
+    setSaveState('saved');
+    showToast(`💾 ${d} → TX:${tx}% RX:${rx}%`);
+  } catch(e) {
+    setSaveState('error');
+    showToast('❌ Error al guardar en db.json');
+  }
+}
+
+function setSaveState(s) {
+  const el = document.getElementById('saveState');
+  el.className = 'save-state ' + s;
+  el.textContent = s === 'saving' ? '⏳ Guardando…'
+                 : s === 'error'  ? '❌ Error al guardar'
+                 :                  '✔ Guardado en db.json';
+}
+
+function updateSliderUI() {
+  const tx = parseInt(document.getElementById('txSlider').value);
+  const rx = parseInt(document.getElementById('rxSlider').value);
+  document.getElementById('txFill').style.width = tx + '%';
+  document.getElementById('rxFill').style.width = rx + '%';
+  document.getElementById('txVal').textContent  = tx + '%';
+  document.getElementById('rxVal').textContent  = rx + '%';
+  const [c1,l1] = getStatus(tx);
+  const [c2,l2] = getStatus(rx);
+  const sp1 = document.getElementById('txStatus');
+  const sp2 = document.getElementById('rxStatus');
+  sp1.className = 'status-pill ' + c1; sp1.textContent = l1;
+  sp2.className = 'status-pill ' + c2; sp2.textContent = l2;
+}
+
+async function clearDept() {
+  if (!currentDept) return;
+  if (!confirm(`¿Eliminar datos de ${currentDept} del archivo db.json?`)) return;
+  try {
+    await apiDelete(currentDept);
+    delete dbCache[currentDept];
+    document.getElementById('txSlider').value = 0;
+    document.getElementById('rxSlider').value = 0;
+    updateSliderUI();
+    updateCountBadge();
+    setSaveState('saved');
+    showToast(`🗑 ${currentDept} eliminado de db.json`);
+  } catch(e) {
+    showToast('❌ Error al eliminar');
+  }
+}
+
+/* ════════════════════════════════════════════════
+   DASHBOARD
+════════════════════════════════════════════════ */
+function renderDashboard() {
+  let sumTx = 0, sumRx = 0, cnt = 0;
+  DEPTS.forEach(d => {
+    const r = dbCache[d];
+    if (r) { sumTx += r.tx||0; sumRx += r.rx||0; cnt++; }
+  });
+  const avgTx  = cnt ? Math.round(sumTx / cnt) : 0;
+  const avgRx  = cnt ? Math.round(sumRx / cnt) : 0;
+  const avgAll = Math.round((avgTx + avgRx) / 2);
+
+  document.getElementById('gTx').textContent  = avgTx  + '%';
+  document.getElementById('gRx').textContent  = avgRx  + '%';
+  document.getElementById('gAvg').textContent = avgAll + '%';
+  document.getElementById('gCnt').textContent = cnt + '/20';
+  document.getElementById('gTxBar').style.width  = avgTx  + '%';
+  document.getElementById('gRxBar').style.width  = avgRx  + '%';
+  document.getElementById('gAvgBar').style.width = avgAll + '%';
+  document.getElementById('gCntBar').style.width = (cnt / 20 * 100) + '%';
+
+  document.getElementById('deptGrid').innerHTML = DEPTS.map(d => {
+    const r       = dbCache[d] || { tx: 0, rx: 0 };
+    const hasData = !!dbCache[d];
+    const avg     = hasData ? Math.round(((r.tx||0) + (r.rx||0)) / 2) : null;
+    const ac      = !hasData ? 'none' : avg < 50 ? 'low' : avg < 80 ? 'mid' : 'high';
+    const cc      = !hasData ? '' : avg >= 100 ? 'complete' : 'has-data';
+    return `
+    <div class="dept-card ${cc}" onclick="editDept('${d}')">
+      <div class="dept-card-header">
+        <div class="dept-card-name">${d}</div>
+        <div class="dept-card-avg ${ac}">${hasData ? avg+'%' : '–'}</div>
+      </div>
+      <div class="dual-bar">
+        <div class="dual-bar-row">
+          <span class="dual-bar-label">TX</span>
+          <div class="dual-bar-track"><div class="dual-bar-fill fill-tx" style="width:${r.tx||0}%"></div></div>
+          <span class="dual-bar-pct pct-tx">${r.tx||0}%</span>
+        </div>
+        <div class="dual-bar-row">
+          <span class="dual-bar-label">RX</span>
+          <div class="dual-bar-track"><div class="dual-bar-fill fill-rx" style="width:${r.rx||0}%"></div></div>
+          <span class="dual-bar-pct pct-rx">${r.rx||0}%</span>
+        </div>
+      </div>
+      <span class="edit-hint">✏️ Clic para editar</span>
+    </div>`;
+  }).join('');
+}
+
+function editDept(d) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+  document.getElementById('panel-editor').classList.add('active');
+  document.querySelectorAll('.tab')[0].classList.add('active');
+  document.getElementById('deptSelect').value = d;
+  loadDept();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+/* ════════════════════════════════════════════════
+   TABLA
+════════════════════════════════════════════════ */
+let sortKey = 'name', sortDir = 1;
+function sortBy(k) {
+  sortKey = sortKey === k ? (sortDir *= -1, k) : (sortDir = 1, k);
+  renderTable();
+}
+
+function renderTable() {
+  const q = document.getElementById('searchInput').value.toLowerCase();
+  const f = document.getElementById('filterSel').value;
+
+  let rows = DEPTS.map(d => {
+    const r = dbCache[d] || { tx: 0, rx: 0, ts: null };
+    const hasData = !!dbCache[d];
+    return { name: d, tx: r.tx||0, rx: r.rx||0,
+             avg: Math.round(((r.tx||0)+(r.rx||0))/2), hasData, ts: r.ts||null };
+  });
+
+  rows = rows.filter(r => {
+    if (q && !r.name.toLowerCase().includes(q)) return false;
+    if (f === 'withdata' && !r.hasData) return false;
+    if (f === 'nodata'   &&  r.hasData) return false;
+    if (f === 'complete' && r.avg < 100) return false;
+    return true;
+  });
+
+  rows.sort((a, b) => {
+    const va = a[sortKey], vb = b[sortKey];
+    return typeof va === 'string' ? sortDir * va.localeCompare(vb) : sortDir * (va - vb);
+  });
+
+  const avgC = v => v < 50 ? 'var(--danger)' : v < 80 ? 'var(--warning)' : 'var(--success)';
+  document.getElementById('tableBody').innerHTML = rows.length
+    ? rows.map(r => `
+      <tr>
+        <td class="td-name" onclick="editDept('${r.name}')">${r.name} <span style="font-size:.62rem;color:var(--muted)">✏️</span></td>
+        <td class="td-tx">${r.hasData ? r.tx+'%' : '—'}</td>
+        <td class="td-rx">${r.hasData ? r.rx+'%' : '—'}</td>
+        <td style="font-weight:700;color:${r.hasData ? avgC(r.avg) : 'var(--muted)'}">${r.hasData ? r.avg+'%' : '—'}</td>
+        <td>${r.hasData ? `<div class="inline-bar"><div class="inline-fill" style="width:${r.avg}%"></div></div>` : '—'}</td>
+        <td>${(()=>{ const [c,l]=getStatus(r.hasData?r.avg:0); return r.hasData
+          ? `<span class="status-pill ${c}">${l}</span>`
+          : '<span style="color:var(--muted);font-size:.72rem">Sin datos</span>'; })()}</td>
+        <td style="color:var(--muted);font-size:.72rem">${r.ts||'—'}</td>
+      </tr>`).join('')
+    : `<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--muted)">Sin resultados</td></tr>`;
+}
+
+async function confirmReset() {
+  if (!confirm('¿Reiniciar TODA la base de datos? Se borrará db.json. Esta acción no se puede deshacer.')) return;
+  try {
+    await apiDelete(null);
+    dbCache = {};
+    updateCountBadge();
+    renderTable();
+    showToast('🗑 db.json reiniciado correctamente');
+  } catch(e) {
+    showToast('❌ Error al reiniciar la base de datos');
+  }
+}
+
+/* ════════════════════════════════════════════════
+   JSON VIEWER
+════════════════════════════════════════════════ */
+async function refreshJson() {
+  const el = document.getElementById('jsonViewer');
+  el.textContent = 'Cargando…';
+  try {
+    const d = await apiGet();
+    dbCache = d;
+    updateCountBadge();
+    el.textContent = JSON.stringify(d, null, 2);
+  } catch(e) {
+    el.textContent = '❌ Error al leer db.json';
+  }
+}
+
+function downloadJson() {
+  const blob = new Blob([JSON.stringify(dbCache, null, 2)], { type: 'application/json' });
+  const a    = document.createElement('a');
+  a.href     = URL.createObjectURL(blob);
+  a.download = 'db.json';
+  a.click();
+}
+
+/* ════════════════════════════════════════════════
+   TOAST
+════════════════════════════════════════════════ */
+let toastTimer;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  document.getElementById('toastMsg').textContent = msg;
+  clearTimeout(toastTimer);
+  t.classList.add('show');
+  toastTimer = setTimeout(() => t.classList.remove('show'), 3500);
+}
+
+/* ════════════════════════════════════════════════
+   ARRANQUE
+════════════════════════════════════════════════ */
+init();
+</script>
+</body>
+</html>
